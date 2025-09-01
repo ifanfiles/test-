@@ -33,7 +33,7 @@
     let adm4Data; 
     let map, marker, geojsonLayer, highlightLayer;
 
-    // Load file GeoJSON (harus ada di repo GitHub, satu folder dengan index.html)
+    // Load file GeoJSON (harus ada di root repo GitHub Pages)
     fetch("Batas_SO_kel.json")
       .then(res => res.json())
       .then(data => {
@@ -54,7 +54,7 @@
         // Marker awal
         marker = L.marker([-7.6795, 109.6661]).addTo(map);
 
-        // Klik di peta
+        // Klik di peta untuk cek lokasi
         map.on("click", function(e) {
           let lat = e.latlng.lat.toFixed(6);
           let lon = e.latlng.lng.toFixed(6);
@@ -64,6 +64,10 @@
 
           cekLokasi();
         });
+      })
+      .catch(err => {
+        console.error("Gagal memuat GeoJSON:", err);
+        document.getElementById("hasil").innerHTML = "❌ GeoJSON tidak dimuat.";
       });
 
     function cekLokasi() {
@@ -80,9 +84,18 @@
       let fiturTerpilih = null;
 
       turf.featureEach(adm4Data, function (feature) {
-        if (turf.booleanPointInPolygon(point, feature)) {
-          ketemu = feature.properties;
-          fiturTerpilih = feature;
+        // Cek apakah feature punya geometry valid
+        if (feature.geometry && feature.geometry.type) {
+          try {
+            if (turf.booleanPointInPolygon(point, feature)) {
+              ketemu = feature.properties;
+              fiturTerpilih = feature;
+            }
+          } catch (e) {
+            console.warn("Error cek polygon:", e, feature);
+          }
+        } else {
+          console.warn("Feature tanpa geometry:", feature.properties);
         }
       });
 
@@ -96,23 +109,20 @@
       }
 
       if (ketemu && fiturTerpilih) {
-        // Tambahkan highlight polygon
+        // Highlight polygon terpilih
         highlightLayer = L.geoJSON(fiturTerpilih, {
           style: { color: "red", weight: 2, fillOpacity: 0.2 }
         }).addTo(map);
 
-        document.getElementById("hasil").innerHTML = `
-          <b>Lokasi Ditemukan:</b><br>
-          Desa/Kelurahan: ${ketemu.NAMOBJ}<br>
-          Kecamatan: ${ketemu.WADMKC}<br>
-          Kabupaten/Kota: ${ketemu.WADMKK}<br>
-          Provinsi: ${ketemu.WADMPR}<br>
-          <b>Kode ADM4:</b> ${ketemu.KDPPUM}
-          <br><br>
-          <a href="https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${ketemu.KDPPUM}" target="_blank">
-            🔗 Cek Prakiraan Cuaca BMKG
-          </a>
-        `;
+        // Tampilkan semua properti feature
+        let propsHtml = "<b>Lokasi Ditemukan:</b><br><ul>";
+        for (let key in ketemu) {
+          propsHtml += `<li><b>${key}</b>: ${ketemu[key]}</li>`;
+        }
+        propsHtml += "</ul>";
+
+        document.getElementById("hasil").innerHTML = propsHtml;
+
       } else {
         document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
       }
