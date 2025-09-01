@@ -4,11 +4,14 @@
   <meta charset="UTF-8">
   <title>Cek Lokasi ADM4 dari GeoJSON</title>
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     input { margin: 5px; padding: 5px; }
-    button { padding: 6px 12px; }
-    #hasil { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+    button { padding: 6px 12px; cursor: pointer; }
+    #hasil { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; }
+    #map { height: 500px; margin-top: 20px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -24,13 +27,44 @@
 
   <div id="hasil">Hasil akan tampil di sini...</div>
 
-  <script>
-    let adm4Data; // GeoJSON ADM4
+  <div id="map"></div>
 
-    // Load file GeoJSON (ganti path sesuai lokasi file kamu)
+  <script>
+    let adm4Data; 
+    let map, marker, geojsonLayer, highlightLayer;
+
+    // Load file GeoJSON (harus ada di repo GitHub, satu folder dengan index.html)
     fetch("Batas_SO_kel.json")
       .then(res => res.json())
-      .then(data => { adm4Data = data; });
+      .then(data => {
+        adm4Data = data;
+
+        // Inisialisasi peta Leaflet
+        map = L.map('map').setView([-7.6795, 109.6661], 11);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Layer batas kelurahan
+        geojsonLayer = L.geoJSON(adm4Data, {
+          style: { color: "#555", weight: 1, fillOpacity: 0 }
+        }).addTo(map);
+
+        // Marker awal
+        marker = L.marker([-7.6795, 109.6661]).addTo(map);
+
+        // Klik di peta
+        map.on("click", function(e) {
+          let lat = e.latlng.lat.toFixed(6);
+          let lon = e.latlng.lng.toFixed(6);
+
+          document.getElementById("lat").value = lat;
+          document.getElementById("lon").value = lon;
+
+          cekLokasi();
+        });
+      });
 
     function cekLokasi() {
       let lat = parseFloat(document.getElementById("lat").value);
@@ -43,14 +77,30 @@
 
       let point = turf.point([lon, lat]);
       let ketemu = null;
+      let fiturTerpilih = null;
 
       turf.featureEach(adm4Data, function (feature) {
         if (turf.booleanPointInPolygon(point, feature)) {
           ketemu = feature.properties;
+          fiturTerpilih = feature;
         }
       });
 
-      if (ketemu) {
+      // Update marker
+      marker.setLatLng([lat, lon]);
+      map.setView([lat, lon], 13);
+
+      // Hapus highlight sebelumnya
+      if (highlightLayer) {
+        map.removeLayer(highlightLayer);
+      }
+
+      if (ketemu && fiturTerpilih) {
+        // Tambahkan highlight polygon
+        highlightLayer = L.geoJSON(fiturTerpilih, {
+          style: { color: "red", weight: 2, fillOpacity: 0.2 }
+        }).addTo(map);
+
         document.getElementById("hasil").innerHTML = `
           <b>Lokasi Ditemukan:</b><br>
           Desa/Kelurahan: ${ketemu.NAMOBJ}<br>
@@ -64,7 +114,7 @@
           </a>
         `;
       } else {
-        document.getElementById("hasil").innerHTML = "❌ Tidak ditemukan di data ADM4.";
+        document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
       }
     }
   </script>
