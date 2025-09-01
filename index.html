@@ -130,56 +130,74 @@
           Provinsi: ${provinsi}
         `;
 
-        // 🔗 Fetch prakiraan cuaca BMKG
-        if (kodeDesa && kodeDesa !== "-") {
-          let url = `https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${kodeDesa}`;
-          try {
-            let res = await fetch(url);
-            let data = await res.json();
+// 🔗 Fetch prakiraan cuaca BMKG
+if (kodeDesa && kodeDesa !== "-") {
+  let url = `https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${kodeDesa}`;
+  try {
+    let res = await fetch(url);
+    let data = await res.json();
 
-            if (data && data.data && data.data[0] && data.data[0].cuaca) {
-              let cuacaList = data.data[0].cuaca.flat();
+    if (data && data.data && data.data[0] && data.data[0].cuaca) {
+      // Ambil data cuaca & filter hanya 12 jam ke depan
+      let now = new Date();
+      let limit = new Date(now.getTime() + 12 * 60 * 60 * 1000); // 12 jam ke depan
 
-              let table = `<h4>Prakiraan Cuaca BMKG</h4>
-                <table>
-                  <tr>
-                    <th>Waktu (Lokal)</th>
-                    <th>Suhu (°C)</th>
-                    <th>Kelembapan (%)</th>
-                    <th>Cuaca</th>
-                  </tr>`;
+      let cuacaList = data.data[0].cuaca.flat().filter(item => {
+        let tgl = new Date(item.local_datetime || item.datetime);
+        return tgl <= limit;
+      });
 
-              cuacaList.forEach(item => {
-                let waktu = item.local_datetime || item.datetime || "-";
-                let suhu = item.t || "-";
-                let kelembapan = item.hu || "-";
-                let cuaca = item.weather_desc || "-";
-                let icon = item.image ? `<img src="${item.image}" alt="${cuaca}" width="25">` : "";
+      let table = `<h4>Prakiraan Cuaca BMKG (12 jam ke depan)</h4>
+        <table border="1" cellspacing="0" cellpadding="4">
+          <tr style="background:#eee">
+            <th>Waktu (Lokal)</th>
+            <th>Suhu (°C)</th>
+            <th>Kelembapan (%)</th>
+            <th>Cuaca</th>
+          </tr>`;
 
-                table += `
-                  <tr>
-                    <td>${waktu}</td>
-                    <td>${suhu}</td>
-                    <td>${kelembapan}</td>
-                    <td>${icon} ${cuaca}</td>
-                  </tr>`;
-              });
-
-              table += "</table>";
-              document.getElementById("forecastTable").innerHTML = table;
-            } else {
-              document.getElementById("forecastTable").innerHTML = "❌ Data cuaca tidak tersedia.";
-            }
-          } catch (e) {
-            console.error("Gagal ambil data BMKG:", e);
-            document.getElementById("forecastTable").innerHTML = "❌ Gagal ambil data BMKG.";
-          }
+      cuacaList.forEach(item => {
+        let waktuRaw = item.local_datetime || item.datetime || "-";
+        let waktuFormatted = "-";
+        if (waktuRaw && waktuRaw !== "-") {
+          let d = new Date(waktuRaw);
+          waktuFormatted = d.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }) + " WIB";
         }
 
-      } else {
-        document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
-        document.getElementById("forecastTable").innerHTML = "";
-      }
+        let suhu = item.t ?? "-";
+        let kelembapan = item.hu ?? "-";
+        let cuaca = item.weather_desc || "-";
+        let icon = item.image ? `<img src="${item.image}" alt="${cuaca}" width="25">` : "";
+
+        table += `
+          <tr>
+            <td>${waktuFormatted}</td>
+            <td style="text-align:center">${suhu}</td>
+            <td style="text-align:center">${kelembapan}</td>
+            <td>${icon} ${cuaca}</td>
+          </tr>`;
+      });
+
+      table += "</table>";
+      document.getElementById("forecastTable").innerHTML = table;
+    } else {
+      document.getElementById("forecastTable").innerHTML = "❌ Data cuaca tidak tersedia.";
+    }
+  } catch (e) {
+    console.error("Gagal ambil data BMKG:", e);
+    document.getElementById("forecastTable").innerHTML = "❌ Gagal ambil data BMKG.";
+  }
+} else {
+  document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
+  document.getElementById("forecastTable").innerHTML = "";
+}
+
     }
   </script>
 </body>
