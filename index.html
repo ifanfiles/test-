@@ -176,48 +176,55 @@
       });
     }
 
-    async function exportPDF() {
-      const { jsPDF } = window.jspdf;
-      let doc = new jsPDF("p", "mm", "a4");
+// print ke pdf
+  async function exportPDF() {
+    const { jsPDF } = window.jspdf;
+    let doc = new jsPDF("p", "mm", "a4");
 
-      // Tambahkan logo BMKG di kanan atas
-      let logo = new Image();
-      logo.src = "https://upload.wikimedia.org/wikipedia/commons/0/0d/BMKG_logo.png";
-      doc.addImage(logo, "PNG", 160, 10, 40, 20);
+    // ✅ Logo BMKG base64 (PNG kecil supaya aman untuk PDF)
+    let bmkgLogo =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABfElEQVR4nO3bMQ6CMBQF0M0YJjHRqLgRqqNS7A02TpgYzRA0V6Z2sHdWBcb7pQdP1VqZn6fe8ztfT9Xz7aFEEIIIYQQQgghhBBCCCGEEEIIoUm9E4cASUejwETGAzxxMQTyY8Q6CzQ7EBcg/ChQCaY/4skTY64RkEdtMjqmtOBkOi4WxB8S1xMoZATZJ3VmNYDhXqS2rMmxsE0ZkClQBWoAo0A1aBKtAKVAFagCrQDVoEq0ApUA8UqfZaXoA+Z8nZzUXYBjU1yxCXguM8GyY5gdnALeSo7McM7sJmSlp+oKwBr2sm50x6Ab0YFzyxCm3QAAAABJRU5ErkJggg==";
 
-      // Judul
-      doc.setFontSize(14);
-      doc.text(document.getElementById("judul").innerText, 10, 20);
+    // Tambahkan logo kanan atas
+    doc.addImage(bmkgLogo, "PNG", 160, 10, 40, 20);
 
-      // Lokasi
-      doc.setFontSize(11);
-      doc.text(document.getElementById("hasil").innerText, 10, 30);
+    // Judul
+    doc.setFontSize(14);
+    doc.text(document.getElementById("judul").innerText, 10, 20);
 
-      // Tambah peta
-      await new Promise(resolve => {
-        leafletImage(map, function(err, canvas) {
-          let img = canvas.toDataURL("image/png");
-          doc.addImage(img, "PNG", 10, 40, 180, 80);
-          resolve();
-        });
+    // Lokasi
+    doc.setFontSize(11);
+    let lokasiText = document.getElementById("hasil").innerText.split("\n");
+    lokasiText.forEach((line, i) => {
+      doc.text(line, 10, 30 + i * 6);
+    });
+
+    // Tambah peta
+    await new Promise(resolve => {
+      leafletImage(map, function (err, canvas) {
+        let img = canvas.toDataURL("image/png");
+        doc.addImage(img, "PNG", 10, 60, 180, 80);
+        resolve();
       });
+    });
 
-      // Tabel
-      let table = document.querySelector("#forecastTable table");
-      doc.autoTable({ html: table, startY: 130 });
+    // Tabel prakiraan
+    let table = document.querySelector("#forecastTable table");
+    doc.autoTable({ html: table, startY: 150 });
 
-      // Chart suhu
-      let tempCanvas = document.getElementById("tempChart");
-      let tempImg = tempCanvas.toDataURL("image/png");
-      doc.addImage(tempImg, "PNG", 10, doc.lastAutoTable.finalY + 10, 90, 60);
+    // Chart suhu
+    let tempCanvas = document.getElementById("tempChart");
+    let tempImg = tempCanvas.toDataURL("image/png");
+    doc.addImage(tempImg, "PNG", 10, doc.lastAutoTable.finalY + 10, 90, 60);
 
-      // Chart kelembapan
-      let humCanvas = document.getElementById("humChart");
-      let humImg = humCanvas.toDataURL("image/png");
-      doc.addImage(humImg, "PNG", 110, doc.lastAutoTable.finalY + 10, 90, 60);
+    // Chart kelembapan
+    let humCanvas = document.getElementById("humChart");
+    let humImg = humCanvas.toDataURL("image/png");
+    doc.addImage(humImg, "PNG", 110, doc.lastAutoTable.finalY + 10, 90, 60);
 
-      doc.save("Prakiraan_Cuaca.pdf");
-    }
+    // Simpan PDF
+    doc.save("Prakiraan_Cuaca.pdf");
+  }
   </script>
 </body>
 </html>
