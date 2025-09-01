@@ -246,12 +246,7 @@
       const { jsPDF } = window.jspdf;
       let doc = new jsPDF("p", "mm", "a4");
 
-      // ✅ Tambah logo BMKG (simpan bmkg.png di repo kamu)
-      let logo = new Image();
-      logo.src = "./bmkg.png";
-      await new Promise(resolve => { logo.onload = () => { 
-        doc.addImage(logo, "PNG", 160, 10, 40, 20); resolve(); 
-      }; });
+      
 
       // Judul
       doc.setFontSize(14);
