@@ -2,69 +2,70 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Prakiraan Cuaca BMKG by Koordinat</title>
+  <title>Cek Lokasi ADM4 dari GeoJSON</title>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     input { margin: 5px; padding: 5px; }
+    button { padding: 6px 12px; }
     #hasil { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
-  <h3>Cek Cuaca BMKG dari Koordinat</h3>
+  <h3>Cek Lokasi Desa/Kecamatan (ADM4)</h3>
+
+  <label for="lat">Latitude:</label>
+  <input type="text" id="lat" value="-7.6795">
   
-  <label>Latitude:</label>
-  <input type="text" id="lat" value="-7.8095">
-  <label>Longitude:</label>
-  <input type="text" id="lon" value="110.3705">
-  <button onclick="cekCuaca()">Tampilkan</button>
+  <label for="lon">Longitude:</label>
+  <input type="text" id="lon" value="109.6661">
   
-  <div id="hasil">Hasil akan muncul di sini...</div>
+  <button onclick="cekLokasi()">Cek Lokasi</button>
+
+  <div id="hasil">Hasil akan tampil di sini...</div>
 
   <script>
-    // Contoh dictionary kecil mapping nama desa/kecamatan -> adm4 (aslinya perlu file JSON lengkap)
-    const kodeWilayah = {
-      "Caturtunggal": "34.04.16.2001", // contoh: Kelurahan Caturtunggal, Sleman
-      "Condongcatur": "34.04.16.1001",
-      "Sinduadi": "34.04.13.1001"
-      // tambahkan data lengkap sesuai kebutuhan
-    };
+    let adm4Data; // GeoJSON ADM4
 
-    async function cekCuaca() {
-      let lat = document.getElementById("lat").value;
-      let lon = document.getElementById("lon").value;
-      let hasilDiv = document.getElementById("hasil");
+    // Load file GeoJSON (ganti path sesuai lokasi file kamu)
+    fetch("Batas_SO_kel.json")
+      .then(res => res.json())
+      .then(data => { adm4Data = data; });
 
-      // 1. Reverse geocoding (ambil nama desa/kecamatan)
-      let url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-      let res = await fetch(url);
-      let data = await res.json();
+    function cekLokasi() {
+      let lat = parseFloat(document.getElementById("lat").value);
+      let lon = parseFloat(document.getElementById("lon").value);
 
-      let addr = data.address;
-      let kelurahan = addr.village || addr.hamlet || addr.town || addr.suburb || "-";
-
-      // 2. Cari kode adm4
-      let kode = kodeWilayah[kelurahan];
-
-      if (!kode) {
-        hasilDiv.innerHTML = `❌ Lokasi <b>${kelurahan}</b> belum ada di mapping kodeWilayah.`;
+      if (!adm4Data) {
+        document.getElementById("hasil").innerHTML = "GeoJSON belum dimuat.";
         return;
       }
 
-      // 3. Panggil API BMKG
-      let urlBMKG = `https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${kode}`;
-      let resBMKG = await fetch(urlBMKG);
-      let dataBMKG = await resBMKG.json();
+      let point = turf.point([lon, lat]);
+      let ketemu = null;
 
-      // 4. Tampilkan cuaca (contoh: ambil 3 jam pertama)
-      let cuaca = dataBMKG.data[0].cuaca;
-      let waktu = dataBMKG.data[0].jamCuaca;
+      turf.featureEach(adm4Data, function (feature) {
+        if (turf.booleanPointInPolygon(point, feature)) {
+          ketemu = feature.properties;
+        }
+      });
 
-      hasilDiv.innerHTML = `
-        <b>Lokasi:</b> ${kelurahan} <br>
-        <b>Kode adm4:</b> ${kode} <br><br>
-        <b>Prakiraan:</b><br>
-        Jam ${waktu} → ${cuaca}
-      `;
+      if (ketemu) {
+        document.getElementById("hasil").innerHTML = `
+          <b>Lokasi Ditemukan:</b><br>
+          Desa/Kelurahan: ${ketemu.NAMOBJ}<br>
+          Kecamatan: ${ketemu.WADMKC}<br>
+          Kabupaten/Kota: ${ketemu.WADMKK}<br>
+          Provinsi: ${ketemu.WADMPR}<br>
+          <b>Kode ADM4:</b> ${ketemu.KDPPUM}
+          <br><br>
+          <a href="https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${ketemu.KDPPUM}" target="_blank">
+            🔗 Cek Prakiraan Cuaca BMKG
+          </a>
+        `;
+      } else {
+        document.getElementById("hasil").innerHTML = "❌ Tidak ditemukan di data ADM4.";
+      }
     }
   </script>
 </body>
