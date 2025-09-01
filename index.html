@@ -241,19 +241,32 @@
     }
 
     // Export ke PDF
-    function exportPDF() {
-      const { jsPDF } = window.jspdf;
-      let doc = new jsPDF();
+   function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  let doc = new jsPDF("p", "mm", "a4");
 
-      // Judul
-      doc.setFontSize(14);
-      doc.text(document.getElementById("judulPrakiraan").innerText, 10, 10);
+  // Judul
+  doc.setFontSize(14);
+  doc.text(document.getElementById("judulPrakiraan").innerText, 10, 10);
 
-      // Tabel
-      doc.autoTable({ html: "#forecastData", startY: 20 });
+  // Tabel prakiraan
+  doc.autoTable({ html: "#forecastData", startY: 20 });
 
-      doc.save("prakiraan_cuaca.pdf");
-    }
+  let finalY = doc.lastAutoTable.finalY + 10;
+
+  // Chart suhu ke gambar
+  let suhuCanvas = document.getElementById("suhuChart");
+  let suhuImg = suhuCanvas.toDataURL("image/png", 1.0);
+  doc.addImage(suhuImg, "PNG", 10, finalY, 90, 60);
+
+  // Chart kelembapan ke gambar
+  let kelembapanCanvas = document.getElementById("kelembapanChart");
+  let kelembapanImg = kelembapanCanvas.toDataURL("image/png", 1.0);
+  doc.addImage(kelembapanImg, "PNG", 110, finalY, 90, 60);
+
+  doc.save("prakiraan_cuaca.pdf");
+}
+
   </script>
 </body>
 </html>
