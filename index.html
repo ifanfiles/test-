@@ -115,15 +115,14 @@
   }).addTo(map);
 
   // Tampilkan field utama saja
-  let propsHtml = `
+   let propsHtml = `
     <b>Lokasi Ditemukan:</b><br>
-    Kode Desa (ADM4): ${ketemu.KDPPUM || "-"}<br>
-    Desa/Kelurahan: ${ketemu.NAMOBJ || "-"}<br>
-    Kecamatan: ${ketemu.WADMKC || "-"}<br>
-    Kabupaten/Kota: ${ketemu.WADMKK || "-"}<br>
-    Provinsi: ${ketemu.WADMPR || "-"}
+    Kode Desa (ADM4): ${ketemu.KDPPUM || ketemu.ADM4_PCODE || "-"}<br>
+    Desa/Kelurahan: ${ketemu.NAMOBJ || ketemu.NAME_4 || "-"}<br>
+    Kecamatan: ${ketemu.WADMKC || ketemu.NAME_3 || "-"}<br>
+    Kabupaten/Kota: ${ketemu.WADMKK || ketemu.NAME_2 || "-"}<br>
+    Provinsi: ${ketemu.WADMPR || ketemu.NAME_1 || "-"}
   `;
-
   document.getElementById("hasil").innerHTML = propsHtml;
 
 } else {
