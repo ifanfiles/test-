@@ -108,14 +108,14 @@
         map.removeLayer(highlightLayer);
       }
 
-     if (ketemu && fiturTerpilih) {
+  if (ketemu && fiturTerpilih) {
   // Highlight polygon terpilih
   highlightLayer = L.geoJSON(fiturTerpilih, {
     style: { color: "red", weight: 2, fillOpacity: 0.2 }
   }).addTo(map);
 
-  // Tampilkan field utama saja
-   let propsHtml = `
+  // Tampilkan field utama dengan fallback
+  let propsHtml = `
     <b>Lokasi Ditemukan:</b><br>
     Kode Desa (ADM4): ${ketemu.KDPPUM || ketemu.ADM4_PCODE || "-"}<br>
     Desa/Kelurahan: ${ketemu.NAMOBJ || ketemu.NAME_4 || "-"}<br>
@@ -123,16 +123,11 @@
     Kabupaten/Kota: ${ketemu.WADMKK || ketemu.NAME_2 || "-"}<br>
     Provinsi: ${ketemu.WADMPR || ketemu.NAME_1 || "-"}
   `;
-  document.getElementById("hasil").innerHTML = propsHtml;
 
+  document.getElementById("hasil").innerHTML = propsHtml;
 } else {
   document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
 }
-
-
-      } else {
-        document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
-      }
     }
   </script>
 </body>
