@@ -2,11 +2,12 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Windy Embed Dua Iframe</title>
+  <title>Windy Embed + Reverse Geocoding</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     input { margin: 5px; padding: 5px; }
     iframe { margin-top: 15px; border: none; display: block; }
+    #alamat { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -37,8 +38,11 @@
     src="https://embed.windy.com/embed.html?type=forecast&location=coordinates&detail=true&detailLat=-7.8095&detailLon=110.3705&metricTemp=default&metricRain=default&metricWind=default">
   </iframe>
 
+  <!-- Info Alamat -->
+  <div id="alamat">Alamat lokasi akan tampil di sini...</div>
+
   <script>
-    function updateMaps() {
+    async function updateMaps() {
       let lat = document.getElementById("lat").value;
       let lon = document.getElementById("lon").value;
 
@@ -49,6 +53,30 @@
       // update iframe forecast
       document.getElementById("windyForecast").src = 
         `https://embed.windy.com/embed.html?type=forecast&location=coordinates&detail=true&detailLat=${lat}&detailLon=${lon}&metricTemp=default&metricRain=default&metricWind=default`;
+
+      // panggil reverse geocoding API (Nominatim OSM)
+      let url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+
+      try {
+        let res = await fetch(url);
+        let data = await res.json();
+
+        let addr = data.address;
+        let desa = addr.village || addr.hamlet || addr.town || "-";
+        let kecamatan = addr.suburb || addr.county || "-";
+        let kabupaten = addr.city || addr.municipality || addr.state_district || "-";
+        let provinsi = addr.state || "-";
+
+        document.getElementById("alamat").innerHTML = `
+          <b>Hasil Identifikasi:</b><br>
+          Desa/Kelurahan: ${desa}<br>
+          Kecamatan: ${kecamatan}<br>
+          Kabupaten/Kota: ${kabupaten}<br>
+          Provinsi: ${provinsi}
+        `;
+      } catch (e) {
+        document.getElementById("alamat").innerHTML = "Gagal mengambil data alamat.";
+      }
     }
   </script>
 </body>
