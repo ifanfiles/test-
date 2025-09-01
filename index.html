@@ -241,31 +241,49 @@
     }
 
     // Export ke PDF
-   function exportPDF() {
+   async function exportPDF() {
   const { jsPDF } = window.jspdf;
   let doc = new jsPDF("p", "mm", "a4");
 
-  // Judul
+  // 1. Judul
   doc.setFontSize(14);
   doc.text(document.getElementById("judulPrakiraan").innerText, 10, 10);
 
-  // Tabel prakiraan
-  doc.autoTable({ html: "#forecastData", startY: 20 });
+  // 2. Lokasi ditemukan
+  let hasilLokasi = document.getElementById("hasil").innerText;
+  let splitText = doc.splitTextToSize(hasilLokasi, 180);
+  doc.setFontSize(11);
+  doc.text(splitText, 10, 20);
 
-  let finalY = doc.lastAutoTable.finalY + 10;
+  // 3. Render peta Leaflet ke gambar
+  await new Promise((resolve) => {
+    leafletImage(map, function (err, canvas) {
+      let imgData = canvas.toDataURL("image/png");
+      doc.addImage(imgData, "PNG", 10, 40, 180, 80);
+      resolve();
+    });
+  });
 
-  // Chart suhu ke gambar
+  let currentY = 125;
+
+  // 4. Tabel prakiraan
+  doc.autoTable({ html: "#forecastData", startY: currentY });
+  currentY = doc.lastAutoTable.finalY + 10;
+
+  // 5. Grafik suhu
   let suhuCanvas = document.getElementById("suhuChart");
   let suhuImg = suhuCanvas.toDataURL("image/png", 1.0);
-  doc.addImage(suhuImg, "PNG", 10, finalY, 90, 60);
+  doc.addImage(suhuImg, "PNG", 10, currentY, 90, 60);
 
-  // Chart kelembapan ke gambar
+  // 6. Grafik kelembapan
   let kelembapanCanvas = document.getElementById("kelembapanChart");
   let kelembapanImg = kelembapanCanvas.toDataURL("image/png", 1.0);
-  doc.addImage(kelembapanImg, "PNG", 110, finalY, 90, 60);
+  doc.addImage(kelembapanImg, "PNG", 110, currentY, 90, 60);
 
+  // Simpan PDF
   doc.save("prakiraan_cuaca.pdf");
 }
+
 
   </script>
 </body>
