@@ -34,7 +34,7 @@
     let map, marker, geojsonLayer, highlightLayer;
 
     // Load file GeoJSON (harus ada di repo GitHub, satu folder dengan index.html)
-    fetch("Batas_SO_kel.json")
+    fetch("Batas_SO_kel.geojson")
       .then(res => res.json())
       .then(data => {
         adm4Data = data;
