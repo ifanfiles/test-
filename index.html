@@ -108,20 +108,28 @@
         map.removeLayer(highlightLayer);
       }
 
-      if (ketemu && fiturTerpilih) {
-        // Highlight polygon terpilih
-        highlightLayer = L.geoJSON(fiturTerpilih, {
-          style: { color: "red", weight: 2, fillOpacity: 0.2 }
-        }).addTo(map);
+     if (ketemu && fiturTerpilih) {
+  // Highlight polygon terpilih
+  highlightLayer = L.geoJSON(fiturTerpilih, {
+    style: { color: "red", weight: 2, fillOpacity: 0.2 }
+  }).addTo(map);
 
-        // Tampilkan semua properti feature
-        let propsHtml = "<b>Lokasi Ditemukan:</b><br><ul>";
-        for (let key in ketemu) {
-          propsHtml += `<li><b>${key}</b>: ${ketemu[key]}</li>`;
-        }
-        propsHtml += "</ul>";
+  // Tampilkan field utama saja
+  let propsHtml = `
+    <b>Lokasi Ditemukan:</b><br>
+    Kode Desa (ADM4): ${ketemu.KDPPUM || "-"}<br>
+    Desa/Kelurahan: ${ketemu.NAMOBJ || "-"}<br>
+    Kecamatan: ${ketemu.WADMKC || "-"}<br>
+    Kabupaten/Kota: ${ketemu.WADMKK || "-"}<br>
+    Provinsi: ${ketemu.WADMPR || "-"}
+  `;
 
-        document.getElementById("hasil").innerHTML = propsHtml;
+  document.getElementById("hasil").innerHTML = propsHtml;
+
+} else {
+  document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
+}
+
 
       } else {
         document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
