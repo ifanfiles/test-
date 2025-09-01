@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Cek Lokasi ADM4 dari GeoJSON + Cuaca BMKG</title>
+  <title>Cek Lokasi ADM4 + Prakiraan BMKG</title>
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -19,13 +19,13 @@
   </style>
 </head>
 <body>
-  <h3>Cek Lokasi Desa/Kecamatan (ADM4)</h3>
+  <h3>Cek Lokasi Desa/Kecamatan (ADM4) + Prakiraan Cuaca BMKG</h3>
 
   <label for="lat">Latitude:</label>
-  <input type="text" id="lat" value="-7.6795">
+  <input type="text" id="lat" value="-6.1764">
   
   <label for="lon">Longitude:</label>
-  <input type="text" id="lon" value="109.6661">
+  <input type="text" id="lon" value="106.8267">
   
   <button onclick="cekLokasi()">Cek Lokasi</button>
 
@@ -38,28 +38,14 @@
     let adm4Data; 
     let map, marker, geojsonLayer, highlightLayer;
 
-    // Fungsi ikon cuaca
-    function getWeatherIcon(desc) {
-      if (!desc) return "❓";
-      desc = desc.toLowerCase();
-      if (desc.includes("cerah")) return "☀️";
-      if (desc.includes("berawan")) return "⛅";
-      if (desc.includes("hujan ringan")) return "🌦️";
-      if (desc.includes("hujan sedang")) return "🌧️";
-      if (desc.includes("hujan lebat")) return "⛈️";
-      if (desc.includes("badai")) return "🌪️";
-      if (desc.includes("kabut")) return "🌫️";
-      return "🌡️";
-    }
-
-    // Load file GeoJSON (harus ada di root repo GitHub Pages)
+    // Load file GeoJSON
     fetch("Batas_SO_kel.json")
       .then(res => res.json())
       .then(data => {
         adm4Data = data;
 
-        // Inisialisasi peta Leaflet
-        map = L.map('map').setView([-7.6795, 109.6661], 11);
+        // Inisialisasi peta
+        map = L.map('map').setView([-6.1764, 106.8267], 11);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap'
@@ -71,9 +57,9 @@
         }).addTo(map);
 
         // Marker awal
-        marker = L.marker([-7.6795, 109.6661]).addTo(map);
+        marker = L.marker([-6.1764, 106.8267]).addTo(map);
 
-        // Klik di peta untuk cek lokasi
+        // Klik peta
         map.on("click", function(e) {
           let lat = e.latlng.lat.toFixed(6);
           let lon = e.latlng.lng.toFixed(6);
@@ -119,49 +105,63 @@
       marker.setLatLng([lat, lon]);
       map.setView([lat, lon], 13);
 
-      // Hapus highlight sebelumnya
+      // Hapus highlight lama
       if (highlightLayer) {
         map.removeLayer(highlightLayer);
       }
 
       if (ketemu && fiturTerpilih) {
-        // Highlight polygon terpilih
         highlightLayer = L.geoJSON(fiturTerpilih, {
           style: { color: "red", weight: 2, fillOpacity: 0.2 }
         }).addTo(map);
 
-        // Info lokasi dasar
-        let propsHtml = `
-          <b>Lokasi Ditemukan:</b><br>
-          Kode Desa (ADM4): ${ketemu.KDEPUM || ketemu.KDPPUM || ketemu.ADM4_PCODE || "-"}<br>
-          Desa/Kelurahan: ${ketemu.NAMOBJ || ketemu.NAME_4 || "-"}<br>
-          Kecamatan: ${ketemu.WADMKC || ketemu.NAME_3 || "-"}<br>
-          Kabupaten/Kota: ${ketemu.WADMKK || ketemu.NAME_2 || "-"}<br>
-          Provinsi: ${ketemu.WADMPR || ketemu.NAME_1 || "-"}
-        `;
-        document.getElementById("hasil").innerHTML = propsHtml;
+        let kodeDesa = ketemu.KDEPUM || ketemu.ADM4_PCODE || "-";
+        let namaDesa = ketemu.NAMOBJ || ketemu.NAME_4 || "-";
+        let kecamatan = ketemu.WADMKC || ketemu.NAME_3 || "-";
+        let kabupaten = ketemu.WADMKK || ketemu.NAME_2 || "-";
+        let provinsi = ketemu.WADMPR || ketemu.NAME_1 || "-";
 
-        // --- Ambil prakiraan cuaca dari BMKG ---
-        let kodeAdm4 = ketemu.KDEPUM || ketemu.KDPPUM || ketemu.ADM4_PCODE;
-        if (kodeAdm4) {
+        document.getElementById("hasil").innerHTML = `
+          <b>Lokasi Ditemukan:</b><br>
+          Kode Desa (ADM4): ${kodeDesa}<br>
+          Desa/Kelurahan: ${namaDesa}<br>
+          Kecamatan: ${kecamatan}<br>
+          Kabupaten/Kota: ${kabupaten}<br>
+          Provinsi: ${provinsi}
+        `;
+
+        // 🔗 Fetch prakiraan cuaca BMKG
+        if (kodeDesa && kodeDesa !== "-") {
+          let url = `https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${kodeDesa}`;
           try {
-            let res = await fetch(`https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${kodeAdm4}`);
+            let res = await fetch(url);
             let data = await res.json();
-            console.log("Data BMKG:", data);
 
             if (data && data.data && data.data[0] && data.data[0].cuaca) {
-              let cuacaList = data.data[0].cuaca;
-              let table = `<table>
-                <tr><th>Tanggal/Jam</th><th>Suhu (°C)</th><th>Kelembapan (%)</th><th>Cuaca</th></tr>`;
+              let cuacaList = data.data[0].cuaca.flat();
+
+              let table = `<h4>Prakiraan Cuaca BMKG</h4>
+                <table>
+                  <tr>
+                    <th>Waktu (Lokal)</th>
+                    <th>Suhu (°C)</th>
+                    <th>Kelembapan (%)</th>
+                    <th>Cuaca</th>
+                  </tr>`;
 
               cuacaList.forEach(item => {
-                let icon = getWeatherIcon(item.weather);
+                let waktu = item.local_datetime || item.datetime || "-";
+                let suhu = item.t || "-";
+                let kelembapan = item.hu || "-";
+                let cuaca = item.weather_desc || "-";
+                let icon = item.image ? `<img src="${item.image}" alt="${cuaca}" width="25">` : "";
+
                 table += `
                   <tr>
-                    <td>${item.jamCuaca}</td>
-                    <td>${item.t || "-"}</td>
-                    <td>${item.hu || "-"}</td>
-                    <td>${icon} ${item.weather || "-"}</td>
+                    <td>${waktu}</td>
+                    <td>${suhu}</td>
+                    <td>${kelembapan}</td>
+                    <td>${icon} ${cuaca}</td>
                   </tr>`;
               });
 
@@ -170,12 +170,10 @@
             } else {
               document.getElementById("forecastTable").innerHTML = "❌ Data cuaca tidak tersedia.";
             }
-          } catch (err) {
-            console.error("Gagal ambil data BMKG:", err);
-            document.getElementById("forecastTable").innerHTML = "⚠️ Gagal mengambil data cuaca.";
+          } catch (e) {
+            console.error("Gagal ambil data BMKG:", e);
+            document.getElementById("forecastTable").innerHTML = "❌ Gagal ambil data BMKG.";
           }
-        } else {
-          document.getElementById("forecastTable").innerHTML = "⚠️ Kode ADM4 tidak ditemukan.";
         }
 
       } else {
