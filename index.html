@@ -2,13 +2,17 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Windy Embed + Reverse Geocoding</title>
+  <title>Windy Embed + Reverse Geocoding + Marker</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     input { margin: 5px; padding: 5px; }
     iframe { margin-top: 15px; border: none; display: block; }
     #alamat { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+    #map { height: 300px; margin-top: 20px; }
   </style>
+
+  <!-- Tambahkan Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 </head>
 <body>
   <h3>Pilih Lokasi</h3>
@@ -41,10 +45,25 @@
   <!-- Info Alamat -->
   <div id="alamat">Alamat lokasi akan tampil di sini...</div>
 
+  <!-- Peta Leaflet -->
+  <div id="map"></div>
+
+  <!-- Tambahkan Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
   <script>
+    // Inisialisasi Leaflet map
+    var map = L.map('map').setView([-7.8095, 110.3705], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    var marker = L.marker([-7.8095, 110.3705]).addTo(map);
+
     async function updateMaps() {
-      let lat = document.getElementById("lat").value;
-      let lon = document.getElementById("lon").value;
+      let lat = parseFloat(document.getElementById("lat").value);
+      let lon = parseFloat(document.getElementById("lon").value);
 
       // update iframe map
       document.getElementById("windyMap").src = 
@@ -53,6 +72,10 @@
       // update iframe forecast
       document.getElementById("windyForecast").src = 
         `https://embed.windy.com/embed.html?type=forecast&location=coordinates&detail=true&detailLat=${lat}&detailLon=${lon}&metricTemp=default&metricRain=default&metricWind=default`;
+
+      // update marker Leaflet
+      marker.setLatLng([lat, lon]);
+      map.setView([lat, lon], 11);
 
       // panggil reverse geocoding API (Nominatim OSM)
       let url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
