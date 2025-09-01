@@ -117,7 +117,7 @@
   // Tampilkan field utama dengan fallback
   let propsHtml = `
     <b>Lokasi Ditemukan:</b><br>
-    Kode Desa (ADM4): ${ketemu.KDPPUM || ketemu.ADM4_PCODE || "-"}<br>
+    Kode Desa (ADM4): ${ketemu.KDEPUM || ketemu.ADM4_PCODE || "-"}<br>
     Desa/Kelurahan: ${ketemu.NAMOBJ || ketemu.NAME_4 || "-"}<br>
     Kecamatan: ${ketemu.WADMKC || ketemu.NAME_3 || "-"}<br>
     Kabupaten/Kota: ${ketemu.WADMKK || ketemu.NAME_2 || "-"}<br>
