@@ -22,10 +22,10 @@
   <h3>Cek Lokasi Desa/Kecamatan (ADM4) + Prakiraan Cuaca BMKG</h3>
 
   <label for="lat">Latitude:</label>
-  <input type="text" id="lat" value="-6.1764">
+  <input type="text" id="lat" value="-7.557">
   
   <label for="lon">Longitude:</label>
-  <input type="text" id="lon" value="106.8267">
+  <input type="text" id="lon" value="109.788">
   
   <button onclick="cekLokasi()">Cek Lokasi</button>
 
@@ -45,7 +45,7 @@
         adm4Data = data;
 
         // Inisialisasi peta
-        map = L.map('map').setView([-6.1764, 106.8267], 11);
+        map = L.map('map').setView([-7.557, 109.788], 11);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap'
