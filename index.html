@@ -2,17 +2,22 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Cek Lokasi ADM4 + Prakiraan BMKG</title>
+  <title>PRAKIRAAN CUACA</title>
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { text-align: center; margin-bottom: 10px; }
+    .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .left-controls { display: flex; align-items: center; gap: 5px; }
     input { margin: 5px; padding: 5px; }
     button { padding: 6px 12px; cursor: pointer; }
-    #hasil { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; }
-    #map { height: 500px; margin-top: 20px; border: 1px solid #ccc; }
+    #hasil { margin-top: 10px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; }
+    #map { height: 500px; margin-top: 10px; border: 1px solid #ccc; }
     #forecastTable { margin-top: 20px; }
     table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
@@ -22,18 +27,20 @@
   </style>
 </head>
 <body>
-  <h3>Cek Lokasi Desa/Kecamatan (ADM4) + Prakiraan Cuaca BMKG</h3>
+  <h2 id="judulPrakiraan">PRAKIRAAN CUACA</h2>
 
-  <label for="lat">Latitude:</label>
-  <input type="text" id="lat" value="-7.557">
-  
-  <label for="lon">Longitude:</label>
-  <input type="text" id="lon" value="109.788">
-  
-  <button onclick="cekLokasi()">Cek Lokasi</button>
+  <div class="controls">
+    <div class="left-controls">
+      <label for="lat">Latitude:</label>
+      <input type="text" id="lat" value="-7.557">
+      <label for="lon">Longitude:</label>
+      <input type="text" id="lon" value="109.788">
+      <button onclick="cekLokasi()">Cek Lokasi</button>
+    </div>
+    <button onclick="exportPDF()">📄 Export PDF</button>
+  </div>
 
   <div id="hasil">Hasil akan tampil di sini...</div>
-
   <div id="map"></div>
   <div id="forecastTable"></div>
 
@@ -46,6 +53,7 @@
     let adm4Data; 
     let map, marker, geojsonLayer, highlightLayer;
     let suhuChart, kelembapanChart;
+    let globalCuacaList = [];
 
     function parseBmkgDate(s) {
       if (!s) return null;
@@ -144,10 +152,19 @@
             let data = await res.json();
 
             if (data && data.data && data.data[0] && data.data[0].cuaca) {
-              let cuacaList = data.data[0].cuaca.flat(Infinity);
+              globalCuacaList = data.data[0].cuaca.flat(Infinity);
 
+              // Ambil rentang waktu
+              let startDate = parseBmkgDate(globalCuacaList[0].local_datetime || globalCuacaList[0].datetime);
+              let endDate = parseBmkgDate(globalCuacaList[globalCuacaList.length - 1].local_datetime || globalCuacaList[globalCuacaList.length - 1].datetime);
+
+              let startStr = startDate.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              let endStr = endDate.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              document.getElementById("judulPrakiraan").innerText = `PRAKIRAAN CUACA ${startStr} s/d ${endStr} WIB`;
+
+              // Tabel prakiraan
               let table = `<h4>Prakiraan Cuaca BMKG (3 hari ke depan)</h4>
-                <table border="1" cellspacing="0" cellpadding="4">
+                <table id="forecastData" border="1" cellspacing="0" cellpadding="4">
                   <tr style="background:#eee">
                     <th>Waktu (Lokal)</th>
                     <th>Suhu (°C)</th>
@@ -157,7 +174,7 @@
 
               let labels = [], suhuData = [], kelembapanData = [];
 
-              cuacaList.forEach(item => {
+              globalCuacaList.forEach(item => {
                 let waktuRaw = item.local_datetime || item.datetime || "-";
                 let waktuFormatted = "-";
                 if (waktuRaw && waktuRaw !== "-") {
@@ -197,31 +214,13 @@
               let ctxSuhu = document.getElementById("suhuChart").getContext("2d");
               suhuChart = new Chart(ctxSuhu, {
                 type: "line",
-                data: {
-                  labels: labels,
-                  datasets: [{
-                    label: "Suhu (°C)",
-                    data: suhuData,
-                    borderColor: "red",
-                    backgroundColor: "rgba(255,0,0,0.2)",
-                    fill: true
-                  }]
-                }
+                data: { labels: labels, datasets: [{ label: "Suhu (°C)", data: suhuData, borderColor: "red", backgroundColor: "rgba(255,0,0,0.2)", fill: true }] }
               });
 
               let ctxKelembapan = document.getElementById("kelembapanChart").getContext("2d");
               kelembapanChart = new Chart(ctxKelembapan, {
                 type: "line",
-                data: {
-                  labels: labels,
-                  datasets: [{
-                    label: "Kelembapan (%)",
-                    data: kelembapanData,
-                    borderColor: "blue",
-                    backgroundColor: "rgba(0,0,255,0.2)",
-                    fill: true
-                  }]
-                }
+                data: { labels: labels, datasets: [{ label: "Kelembapan (%)", data: kelembapanData, borderColor: "blue", backgroundColor: "rgba(0,0,255,0.2)", fill: true }] }
               });
 
             } else {
@@ -239,6 +238,21 @@
         document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
         document.getElementById("forecastTable").innerHTML = "";
       }
+    }
+
+    // Export ke PDF
+    function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      let doc = new jsPDF();
+
+      // Judul
+      doc.setFontSize(14);
+      doc.text(document.getElementById("judulPrakiraan").innerText, 10, 10);
+
+      // Tabel
+      doc.autoTable({ html: "#forecastData", startY: 20 });
+
+      doc.save("prakiraan_cuaca.pdf");
     }
   </script>
 </body>
