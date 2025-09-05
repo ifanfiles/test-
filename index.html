@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -61,6 +62,7 @@
       return new Date(s.replace(' ', 'T'));
     }
 
+    // Muat GeoJSON batas wilayah
     fetch("Batas_SO_kel.json")
       .then(res => res.json())
       .then(data => {
@@ -187,12 +189,100 @@
               let endStr = endDate.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
               document.getElementById("judulPrakiraan").innerText = `PRAKIRAAN CUACA ${startStr} s/d ${endStr} WIB`;
 
-              // ... (bagian tabel & chart tetap sama seperti revisi terakhir)
+              // ====== Tabel lengkap ======
+              let table = `<h4>Prakiraan Cuaca BMKG (3 hari ke depan)</h4>
+                <table id="forecastData" border="1" cellspacing="0" cellpadding="4">
+                  <tr style="background:#eee">
+                    <th>Waktu (Lokal)</th>
+                    <th>Suhu (°C)</th>
+                    <th>Kelembapan (%)</th>
+                    <th>Cuaca</th>
+                    <th>Angin (km/jam)</th>
+                    <th>Arah Angin</th>
+                    <th>Tutupan Awan (%)</th>
+                    <th>Visibility</th>
+                  </tr>`;
+
+              let labels = [], suhuData = [], kelembapanData = [];
+
+              globalCuacaList.forEach(item => {
+                let waktuRaw = item.local_datetime || item.datetime || "-";
+                let waktuFormatted = "-";
+                if (waktuRaw && waktuRaw !== "-") {
+                  let d = parseBmkgDate(waktuRaw);
+                  if (d) {
+                    waktuFormatted = d.toLocaleString("id-ID", {
+                      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                    });
+                  }
+                }
+
+                let suhu = item.t ?? "-";
+                let kelembapan = item.hu ?? "-";
+                let cuaca = item.weather_desc || "-";
+                let icon = item.image ? `<img src="${item.image}" alt="${cuaca}" width="25">` : "";
+                let ws = item.ws ?? "-";
+                let wd = item.wd ?? "-";
+                let tcc = item.tcc ?? "-";
+                let vs = item.vs_text ?? "-";
+
+                if (waktuFormatted !== "-") labels.push(waktuFormatted);
+                if (suhu !== "-") suhuData.push(suhu);
+                if (kelembapan !== "-") kelembapanData.push(kelembapan);
+
+                table += `
+                  <tr>
+                    <td>${waktuFormatted}</td>
+                    <td>${suhu}</td>
+                    <td>${kelembapan}</td>
+                    <td>${icon} ${cuaca}</td>
+                    <td>${ws}</td>
+                    <td>${wd}</td>
+                    <td>${tcc}</td>
+                    <td>${vs}</td>
+                  </tr>`;
+              });
+
+              table += "</table>";
+              document.getElementById("forecastTable").innerHTML = table;
+
+              // ====== Chart gabungan suhu & kelembapan ======
+              if (suhuChart) suhuChart.destroy();
+              let ctxSuhu = document.getElementById("suhuChart").getContext("2d");
+              suhuChart = new Chart(ctxSuhu, {
+                type: "line",
+                data: {
+                  labels: labels,
+                  datasets: [
+                    { label: "Suhu (°C)", data: suhuData, borderColor: "red", backgroundColor: "rgba(255,0,0,0.2)", yAxisID: "y" },
+                    { label: "Kelembapan (%)", data: kelembapanData, borderColor: "blue", backgroundColor: "rgba(0,0,255,0.2)", yAxisID: "y1" }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  interaction: { mode: 'index', intersect: false },
+                  stacked: false,
+                  scales: {
+                    y: { type: "linear", position: "left", title:{display:true,text:"Suhu (°C)"} },
+                    y1: { type: "linear", position: "right", grid: { drawOnChartArea: false }, title:{display:true,text:"Kelembapan (%)"} }
+                  }
+                }
+              });
+
+            } else {
+              document.getElementById("forecastTable").innerHTML = "❌ Data cuaca tidak tersedia.";
             }
           } catch (e) {
             console.error("Gagal ambil data BMKG:", e);
+            document.getElementById("forecastTable").innerHTML = "❌ Gagal ambil data BMKG.";
           }
+        } else {
+          document.getElementById("forecastTable").innerHTML = "";
         }
+
+      } else {
+        document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
+        document.getElementById("forecastTable").innerHTML = "";
       }
     }
 
@@ -200,6 +290,7 @@
       const { jsPDF } = window.jspdf;
       let doc = new jsPDF("p", "mm", "a4");
       doc.text("Prakiraan Cuaca", 10, 20);
+      doc.autoTable({ html: "#forecastData", startY: 30 });
       doc.save("prakiraan_cuaca.pdf");
     }
   </script>
