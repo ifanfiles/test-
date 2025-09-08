@@ -1,0 +1,298 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>PRAKIRAAN CUACA</title>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { text-align: center; margin-bottom: 10px; }
+    .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .left-controls { display: flex; align-items: center; gap: 5px; }
+    input { margin: 5px; padding: 5px; }
+    button { padding: 6px 12px; cursor: pointer; background:#2c7be5; color:#fff; border:none; border-radius:6px; font-weight:600; }
+    button:hover { background:#1a5fb4; }
+    #hasil { margin-top: 10px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; }
+    #map { height: 500px; margin-top: 10px; border: 1px solid #ccc; }
+    #forecastTable { margin-top: 20px; overflow-x:auto; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { background: #eee; }
+    .chart-container { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2 id="judulPrakiraan">PRAKIRAAN CUACA</h2>
+
+  <div class="controls">
+    <div class="left-controls">
+      <label for="lat">Latitude:</label>
+      <input type="text" id="lat" value="-7.557">
+      <label for="lon">Longitude:</label>
+      <input type="text" id="lon" value="109.788">
+      <button onclick="cekLokasi()">Cek Lokasi</button>
+    </div>
+    <button onclick="exportPDF()">📄 Export PDF</button>
+  </div>
+
+  <div id="hasil">Hasil akan tampil di sini...</div>
+  <div id="map"></div>
+  <div id="forecastTable"></div>
+
+  <div class="chart-container">
+    <canvas id="suhuChart"></canvas>
+  </div>
+
+  <script>
+    let adm4Data; 
+    let map, marker, geojsonLayer, highlightLayer;
+    let suhuChart;
+    let globalCuacaList = [];
+
+    function parseBmkgDate(s) {
+      if (!s) return null;
+      if (s.includes('T') && s.endsWith('Z')) return new Date(s);
+      return new Date(s.replace(' ', 'T'));
+    }
+
+    // Muat GeoJSON batas wilayah
+    fetch("manggarai_barat.json")
+      .then(res => res.json())
+      .then(data => {
+        adm4Data = data;
+        const startLat = parseFloat(document.getElementById("lat").value);
+        const startLon = parseFloat(document.getElementById("lon").value);
+        map = L.map('map').setView([startLat, startLon], 11);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        geojsonLayer = L.geoJSON(adm4Data, {
+          style: { color: "#555", weight: 1, fillOpacity: 0 }
+        }).addTo(map);
+
+        marker = L.marker([startLat, startLon]).addTo(map);
+
+        map.on("click", function(e) {
+          let lat = e.latlng.lat.toFixed(6);
+          let lon = e.latlng.lng.toFixed(6);
+          document.getElementById("lat").value = lat;
+          document.getElementById("lon").value = lon;
+          cekLokasi();
+        });
+      })
+      .catch(err => {
+        console.error("Gagal memuat GeoJSON:", err);
+        document.getElementById("hasil").innerHTML = "❌ GeoJSON tidak dimuat.";
+      });
+
+    // 🛰️ Ambil koordinat perangkat saat load halaman
+    window.addEventListener("load", () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            const lat = pos.coords.latitude.toFixed(6);
+            const lon = pos.coords.longitude.toFixed(6);
+            document.getElementById("lat").value = lat;
+            document.getElementById("lon").value = lon;
+            if (map && marker) {
+              map.setView([lat, lon], 13);
+              marker.setLatLng([lat, lon]);
+            }
+            cekLokasi();
+          },
+          err => {
+            console.warn("❌ Gagal ambil lokasi, fallback default:", err.message);
+            cekLokasi(); // tetap jalan pakai default
+          }
+        );
+      } else {
+        console.warn("Browser tidak mendukung Geolocation");
+        cekLokasi();
+      }
+    });
+
+    async function cekLokasi() {
+      let lat = parseFloat(document.getElementById("lat").value);
+      let lon = parseFloat(document.getElementById("lon").value);
+
+      if (!adm4Data) {
+        document.getElementById("hasil").innerHTML = "GeoJSON belum dimuat.";
+        return;
+      }
+
+      let point = turf.point([lon, lat]);
+      let ketemu = null;
+      let fiturTerpilih = null;
+
+      turf.featureEach(adm4Data, function (feature) {
+        if (feature.geometry && feature.geometry.type) {
+          try {
+            if (turf.booleanPointInPolygon(point, feature)) {
+              ketemu = feature.properties;
+              fiturTerpilih = feature;
+            }
+          } catch (e) {
+            console.warn("Error cek polygon:", e, feature);
+          }
+        }
+      });
+
+      marker.setLatLng([lat, lon]);
+      map.setView([lat, lon], 13);
+
+      if (highlightLayer) {
+        map.removeLayer(highlightLayer);
+      }
+
+      if (ketemu && fiturTerpilih) {
+        highlightLayer = L.geoJSON(fiturTerpilih, {
+          style: { color: "red", weight: 2, fillOpacity: 0.2 }
+        }).addTo(map);
+
+        let kodeDesa = ketemu.KDEPUM || ketemu.ADM4_PCODE || "-";
+        let namaDesa = ketemu.NAMOBJ || ketemu.NAME_4 || "-";
+        let kecamatan = ketemu.WADMKC || ketemu.NAME_3 || "-";
+        let kabupaten = ketemu.WADMKK || ketemu.NAME_2 || "-";
+        let provinsi = ketemu.WADMPR || ketemu.NAME_1 || "-";
+
+        document.getElementById("hasil").innerHTML = `
+          <b>Lokasi Ditemukan:</b><br>
+          Kode Desa (ADM4): ${kodeDesa}<br>
+          Desa/Kelurahan: ${namaDesa}<br>
+          Kecamatan: ${kecamatan}<br>
+          Kabupaten/Kota: ${kabupaten}<br>
+          Provinsi: ${provinsi}
+        `;
+
+        if (kodeDesa && kodeDesa !== "-") {
+          let url = `https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${kodeDesa}`;
+          try {
+            let res = await fetch(url);
+            let data = await res.json();
+
+            if (data && data.data && data.data[0] && data.data[0].cuaca) {
+              globalCuacaList = data.data[0].cuaca.flat(Infinity);
+
+              let startDate = parseBmkgDate(globalCuacaList[0].local_datetime || globalCuacaList[0].datetime);
+              let endDate = parseBmkgDate(globalCuacaList[globalCuacaList.length - 1].local_datetime || globalCuacaList[globalCuacaList.length - 1].datetime);
+
+              let startStr = startDate.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              let endStr = endDate.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              document.getElementById("judulPrakiraan").innerText = `PRAKIRAAN CUACA ${startStr} s/d ${endStr} WIB`;
+
+              // ====== Tabel lengkap ======
+              let table = `<h4>Prakiraan Cuaca BMKG (3 hari ke depan)</h4>
+                <table id="forecastData" border="1" cellspacing="0" cellpadding="4">
+                  <tr style="background:#eee">
+                    <th>Waktu (Lokal)</th>
+                    <th>Suhu (°C)</th>
+                    <th>Kelembapan (%)</th>
+                    <th>Cuaca</th>
+                    <th>Angin (km/jam)</th>
+                    <th>Arah Angin</th>
+                    <th>Tutupan Awan (%)</th>
+                    <th>Visibility</th>
+                  </tr>`;
+
+              let labels = [], suhuData = [], kelembapanData = [];
+
+              globalCuacaList.forEach(item => {
+                let waktuRaw = item.local_datetime || item.datetime || "-";
+                let waktuFormatted = "-";
+                if (waktuRaw && waktuRaw !== "-") {
+                  let d = parseBmkgDate(waktuRaw);
+                  if (d) {
+                    waktuFormatted = d.toLocaleString("id-ID", {
+                      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                    });
+                  }
+                }
+
+                let suhu = item.t ?? "-";
+                let kelembapan = item.hu ?? "-";
+                let cuaca = item.weather_desc || "-";
+                let icon = item.image ? `<img src="${item.image}" alt="${cuaca}" width="25">` : "";
+                let ws = item.ws ?? "-";
+                let wd = item.wd ?? "-";
+                let tcc = item.tcc ?? "-";
+                let vs = item.vs_text ?? "-";
+
+                if (waktuFormatted !== "-") labels.push(waktuFormatted);
+                if (suhu !== "-") suhuData.push(suhu);
+                if (kelembapan !== "-") kelembapanData.push(kelembapan);
+
+                table += `
+                  <tr>
+                    <td>${waktuFormatted}</td>
+                    <td>${suhu}</td>
+                    <td>${kelembapan}</td>
+                    <td>${icon} ${cuaca}</td>
+                    <td>${ws}</td>
+                    <td>${wd}</td>
+                    <td>${tcc}</td>
+                    <td>${vs}</td>
+                  </tr>`;
+              });
+
+              table += "</table>";
+              document.getElementById("forecastTable").innerHTML = table;
+
+              // ====== Chart gabungan suhu & kelembapan ======
+              if (suhuChart) suhuChart.destroy();
+              let ctxSuhu = document.getElementById("suhuChart").getContext("2d");
+              suhuChart = new Chart(ctxSuhu, {
+                type: "line",
+                data: {
+                  labels: labels,
+                  datasets: [
+                    { label: "Suhu (°C)", data: suhuData, borderColor: "red", backgroundColor: "rgba(255,0,0,0.2)", yAxisID: "y" },
+                    { label: "Kelembapan (%)", data: kelembapanData, borderColor: "blue", backgroundColor: "rgba(0,0,255,0.2)", yAxisID: "y1" }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  interaction: { mode: 'index', intersect: false },
+                  stacked: false,
+                  scales: {
+                    y: { type: "linear", position: "left", title:{display:true,text:"Suhu (°C)"} },
+                    y1: { type: "linear", position: "right", grid: { drawOnChartArea: false }, title:{display:true,text:"Kelembapan (%)"} }
+                  }
+                }
+              });
+
+            } else {
+              document.getElementById("forecastTable").innerHTML = "❌ Data cuaca tidak tersedia.";
+            }
+          } catch (e) {
+            console.error("Gagal ambil data BMKG:", e);
+            document.getElementById("forecastTable").innerHTML = "❌ Gagal ambil data BMKG.";
+          }
+        } else {
+          document.getElementById("forecastTable").innerHTML = "";
+        }
+
+      } else {
+        document.getElementById("hasil").innerHTML = "❌ Titik ini tidak ditemukan di data ADM4.";
+        document.getElementById("forecastTable").innerHTML = "";
+      }
+    }
+
+    async function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      let doc = new jsPDF("p", "mm", "a4");
+      doc.text("Prakiraan Cuaca", 10, 20);
+      doc.autoTable({ html: "#forecastData", startY: 30 });
+      doc.save("prakiraan_cuaca.pdf");
+    }
+  </script>
+</body>
+</html>
